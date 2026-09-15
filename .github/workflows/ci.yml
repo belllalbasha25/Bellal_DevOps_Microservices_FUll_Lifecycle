@@ -85,10 +85,20 @@ jobs:
         if: github.event_name != 'pull_request'
         shell: bash
         run: |
-          JWT=$(curl -sS \
+          RESPONSE=$(curl -sS \
             -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
-            | jq -r '.value')
+            -H "Accept: application/json" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com")
+
+          echo "OIDC response received"
+
+          JWT=$(echo "$RESPONSE" | jq -r '.value')
+
+          if [ -z "$JWT" ] || [ "$JWT" = "null" ]; then
+            echo "Failed to obtain OIDC token"
+            echo "$RESPONSE" | jq 'del(.value)'
+            exit 1
+          fi
 
           PAYLOAD=$(echo "$JWT" | cut -d. -f2 | base64 -d 2>/dev/null | jq -r)
 
