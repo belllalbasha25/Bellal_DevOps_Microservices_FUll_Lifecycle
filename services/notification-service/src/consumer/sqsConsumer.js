@@ -12,6 +12,7 @@ async function startSqsConsumer() {
   const client = new SQSClient({ region: REGION });
   logger.info({ queue: QUEUE_URL }, 'starting SQS consumer');
 
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     try {
       const { Messages = [] } = await client.send(new ReceiveMessageCommand({
@@ -43,3 +44,4 @@ async function startSqsConsumer() {
 }
 
 module.exports = { startSqsConsumer };
+

@@ -1,3 +1,4 @@
+
 name: CI
 
 on:
@@ -16,7 +17,7 @@ concurrency:
 
 jobs:
   test:
-    name: Test ${{ matrix.service }}
+    name: Lint & Test ${{ matrix.service }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -25,6 +26,7 @@ jobs:
     defaults:
       run:
         working-directory: services/${{ matrix.service }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -35,7 +37,12 @@ jobs:
           cache-dependency-path: services/${{ matrix.service }}/package-lock.json
 
       - run: npm ci
-      - run: npm test -- --ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --ci
 
   frontend:
     name: Build frontend
@@ -43,6 +50,7 @@ jobs:
     defaults:
       run:
         working-directory: frontend
+
     steps:
       - uses: actions/checkout@v4
 
@@ -53,7 +61,9 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - run: npm ci
-      - run: npm run build
+
+      - name: Build
+        run: npm run build
 
   docker-build:
     name: Docker build ${{ matrix.service }}
@@ -63,8 +73,10 @@ jobs:
       fail-fast: false
       matrix:
         service: [auth-service, product-service, order-service, notification-service, frontend, nginx]
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: docker/setup-buildx-action@v3
 
       - name: Build ${{ matrix.service }} image
@@ -75,3 +87,4 @@ jobs:
           tags: ecommerce-${{ matrix.service }}:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+

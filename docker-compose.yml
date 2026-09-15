@@ -5,8 +5,6 @@ services:
       POSTGRES_USER: ecommerce
       POSTGRES_PASSWORD: devpassword
       POSTGRES_DB: ecommerce
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -28,7 +26,7 @@ services:
       - "3001:3001"
     networks:
       - backplane
-  
+
   product-service:
     build: ./services/product-service
     container_name: ecom-product
@@ -87,7 +85,6 @@ services:
     container_name: ecom-nginx
     ports:
       - "8080:8080"
-    # FIX: Converted array to object syntax for clean structural consistency
     depends_on:
       auth-service:
         condition: service_started
@@ -102,7 +99,6 @@ services:
     networks:
       - backplane
 
-# FIX: Changed "network" to "networks"
 networks:
   backplane:
     driver: bridge
