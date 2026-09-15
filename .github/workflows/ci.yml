@@ -27,10 +27,9 @@ strategy:
 fail-fast: false
 matrix:
 service: [auth-service, product-service, order-service, notification-service]
-
 defaults:
-  run:
-    working-directory: services/${{ matrix.service }}
+run:
+working-directory: services/${{ matrix.service }}
 
 steps:
   - uses: actions/checkout@v4
@@ -52,10 +51,9 @@ steps:
 frontend:
 name: Build frontend
 runs-on: ubuntu-latest
-
 defaults:
-  run:
-    working-directory: frontend
+run:
+working-directory: frontend
 
 steps:
   - uses: actions/checkout@v4
@@ -75,11 +73,10 @@ docker-build:
 name: Docker build ${{ matrix.service }}
 runs-on: ubuntu-latest
 needs: [test, frontend]
-
 strategy:
-  fail-fast: false
-  matrix:
-    service: [auth-service, product-service, order-service, notification-service, frontend, nginx]
+fail-fast: false
+matrix:
+service: [auth-service, product-service, order-service, notification-service, frontend, nginx]
 
 steps:
   - uses: actions/checkout@v4
