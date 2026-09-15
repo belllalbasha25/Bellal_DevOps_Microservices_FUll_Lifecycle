@@ -32,14 +32,18 @@ jobs:
         working-directory: services/${{ matrix.service }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: npm
           cache-dependency-path: services/${{ matrix.service }}/package-lock.json
+
       - run: npm ci
+
       - name: Lint
         run: npm run lint
+
       - name: Test
         run: npm test -- --ci
 
@@ -51,12 +55,15 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
       - run: npm ci
+
       - name: Build
         run: npm run build
 
@@ -68,10 +75,27 @@ jobs:
       fail-fast: false
       matrix:
         service: [auth-service, product-service, order-service, notification-service, frontend, nginx]
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
+
+      - name: Debug OIDC Claims
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          JWT=$(curl -sS \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
+            | jq -r '.value')
+
+          PAYLOAD=$(echo "$JWT" | cut -d. -f2 | base64 -d 2>/dev/null | jq -r)
+
+          echo "sub=$(echo "$PAYLOAD" | jq -r '.sub')"
+          echo "aud=$(echo "$PAYLOAD" | jq -r '.aud')"
+          echo "repository=$(echo "$PAYLOAD" | jq -r '.repository')"
+          echo "ref=$(echo "$PAYLOAD" | jq -r '.ref')"
 
       - name: Configure AWS credentials
         if: github.event_name != 'pull_request'
@@ -119,4 +143,4 @@ jobs:
             ${{ env.ECR_REGISTRY }}/${{ steps.ecr.outputs.repository }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
+          
