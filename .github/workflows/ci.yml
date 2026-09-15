@@ -27,9 +27,11 @@ jobs:
       fail-fast: false
       matrix:
         service: [auth-service, product-service, order-service, notification-service]
+
     defaults:
       run:
         working-directory: services/${{ matrix.service }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -50,9 +52,11 @@ jobs:
   frontend:
     name: Build frontend
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: frontend
+
     steps:
       - uses: actions/checkout@v4
 
@@ -71,41 +75,22 @@ jobs:
     name: Docker build ${{ matrix.service }}
     runs-on: ubuntu-latest
     needs: [test, frontend]
+
     strategy:
       fail-fast: false
       matrix:
-        service: [auth-service, product-service, order-service, notification-service, frontend, nginx]
+        service:
+          - auth-service
+          - product-service
+          - order-service
+          - notification-service
+          - frontend
+          - nginx
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
-
-      - name: Debug OIDC Claims
-        if: github.event_name != 'pull_request'
-        shell: bash
-        run: |
-          RESPONSE=$(curl -sS \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            -H "Accept: application/json" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com")
-
-          echo "OIDC response received"
-
-          JWT=$(echo "$RESPONSE" | jq -r '.value')
-
-          if [ -z "$JWT" ] || [ "$JWT" = "null" ]; then
-            echo "Failed to obtain OIDC token"
-            echo "$RESPONSE" | jq 'del(.value)'
-            exit 1
-          fi
-
-          PAYLOAD=$(echo "$JWT" | cut -d. -f2 | base64 -d 2>/dev/null | jq -r)
-
-          echo "sub=$(echo "$PAYLOAD" | jq -r '.sub')"
-          echo "aud=$(echo "$PAYLOAD" | jq -r '.aud')"
-          echo "repository=$(echo "$PAYLOAD" | jq -r '.repository')"
-          echo "ref=$(echo "$PAYLOAD" | jq -r '.ref')"
 
       - name: Configure AWS credentials
         if: github.event_name != 'pull_request'
@@ -113,6 +98,7 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::722769295788:role/github-actions-oidc-role
           aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions
 
       - name: Login to Amazon ECR
         if: github.event_name != 'pull_request'
