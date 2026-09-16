@@ -11,3 +11,5 @@ coverage/
 .idea/
 .pnp/
 *.tsbuildinfo
+
+oidc-trust.json
