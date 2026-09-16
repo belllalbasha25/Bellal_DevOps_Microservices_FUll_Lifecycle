@@ -1,0 +1,85 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: us-east-1
+  INSTANCE_ID: i-020e3f192334c7f09
+  DEPLOY_SCRIPT: infrastructure/scripts/04-deploy.sh
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout successful CI commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::722769295788:role/github-actions-oidc-role
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-CD
+
+      - name: Prepare deployment script
+        env:
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          SCRIPT_B64=$(base64 -w 0 "$DEPLOY_SCRIPT")
+
+          jq -n \
+            --arg script "$SCRIPT_B64" \
+            --arg tag "$IMAGE_TAG" \
+            '{
+              commands: [
+                ("echo " + $script + " | base64 -d > /tmp/04-deploy.sh"),
+                "chmod +x /tmp/04-deploy.sh",
+                ("bash /tmp/04-deploy.sh " + $tag)
+              ]
+            }' > ssm-parameters.json
+
+      - name: Deploy through SSM
+        id: deploy
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --region "$AWS_REGION" \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters file://ssm-parameters.json \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
+          echo "SSM Command ID: $COMMAND_ID"
+
+      - name: Wait for deployment
+        run: |
+          aws ssm wait command-executed \
+            --region "$AWS_REGION" \
+            --command-id "${{ steps.deploy.outputs.command_id }}" \
+            --instance-id "$INSTANCE_ID"
+
+      - name: Verify deployment
+        run: |
+          aws ssm get-command-invocation \
+            --region "$AWS_REGION" \
+            --command-id "${{ steps.deploy.outputs.command_id }}" \
+            --instance-id "$INSTANCE_ID" \
+            --query "StandardOutputContent" \
+            --output text
